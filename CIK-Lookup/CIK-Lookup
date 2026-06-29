@@ -28,7 +28,57 @@ class SecEdgar:
     def ticker_to_cik(self, ticker):
         return self.ticker_dict.get(ticker.lower())
 
+    def _format_cik(self, cik):
+        return str(cik).zfill(10)
+
+    def _get_filings(self, cik):
+        formatted = self._format_cik(cik)
+        url = f"https://data.sec.gov/submissions/CIK{formatted}.json"
+        headers = {'user-agent': 'MLT KC kcao5@vols.utk.edu'}
+        r = requests.get(url, headers=headers)
+        return r.json()
+
+    def annual_filings(self, cik, year):
+        data = self._get_filings(cik)
+        recent = data['filings']['recent']
+
+        forms = recent['form']
+        dates = recent['filingDate']
+        accessions = recent['accessionNumber']
+        documents = recent['primaryDocument']
+
+        for i in range(len(forms)):
+            if forms[i] == '10-K' and str(year) in dates[i]:
+                accession_clean = accessions[i].replace("-", "")
+                url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_clean}/{documents[i]}"
+                return (forms[i], dates[i], accessions[i], documents[i], url)
+            
+        return None
+    
+    def quarterly_filing(self, cik, year, quarter):
+        data = self._get_filings(cik)
+        recent = data['filings']['recent']
+
+        forms = recent['form']
+        dates = recent['filingDate']
+        accessions = recent['accessionNumber']
+        documents = recent['primaryDocument']
+
+        for i in range(len(forms)):
+            month = int(dates[i].split('-')[1])
+            if month in [1,2,3]:
+                filing_quarter = 1
+            if month in [4,5,6]:
+                filing_quarter = 2
+            if month in [7,8,9]:
+                filing_quarter = 3
+            else:
+                filing_quarter = 4
+            if forms[i] == '10-Q' and str(year) and filing_quarter == quarter:
+                accesion_clean = accessions[i].replace("-","")
+                url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accesion_clean}/{documents[i]}"
+                return (forms[i], dates[i], accessions[i], documents[i], url)
 
 se = SecEdgar("https://www.sec.gov/files/company_tickers.json")
-print (se.name_to_cik("TORONTO DOMINION BANK"))
-print (se.ticker_to_cik("FTNT"))
+cik = se.ticker_to_cik("AAPL")[0]
+print(se.quarterly_filing(cik, 2024, 3))
